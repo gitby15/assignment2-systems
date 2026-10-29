@@ -194,3 +194,7 @@ Peak reserved:  17524.00 MiB
 (b) What is the peak memory usage of each context length when doing a forward pass? What about when doing a full training step?
 Deliverable: A table with two numbers per context length.
 这道题想让我观察到：训练时的内存占用要高于推理，因为autograd和优化器都很占内存
+
+
+(c) Find the peak memory usage of the xl model when using mixed-precision, for both a forward pass and a full training step. Does mixed-precision significantly affect memory usage?
+Deliverable: A 2-3 sentence response.

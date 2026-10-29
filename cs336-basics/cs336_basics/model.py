@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import warnings
+import torch.cuda.nvtx as nvtx
 
 import einx
 import torch
@@ -12,6 +13,7 @@ import torch.nn as nn
 from einops import einsum, rearrange
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
+
 
 from cs336_basics.nn_utils import softmax
 
@@ -432,6 +434,34 @@ def scaled_dot_product_attention(
     attention_weights = softmax(attention_scores, dim=-1)  # Softmax over the key dimension
 
     return einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
+
+@nvtx.range("#attention calculate")
+def annotated_scaled_dot_product_attention(
+    Q: Float[Tensor, " ... queries d_k"],
+    K: Float[Tensor, " ... keys    d_k"],
+    V: Float[Tensor, " ... keys    d_v"],
+    mask: Bool[Tensor, " ... queries keys"] | None = None,
+) -> Float[Tensor, " ... queries d_v"]:
+    """Scaled dot-product attention.
+    代码完全复制scaled_dot_product_attention
+    当需要做profile的时候，换成这个带插桩的版本
+    """
+    # print('==== using annotated attention ====')
+
+    with nvtx.range('#QK einsum'):
+        d_k = K.shape[-1]
+        attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key") / math.sqrt(d_k)
+
+        if mask is not None:
+            attention_scores = torch.where(mask, attention_scores, float("-inf"))
+
+    with nvtx.range('#Softmax QK'):
+        attention_weights = softmax(attention_scores, dim=-1)  # Softmax over the key dimension
+
+    with nvtx.range('#SV einsum'):
+        result = einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
+    return result
+
 
 
 class CausalMultiHeadSelfAttention(nn.Module):
